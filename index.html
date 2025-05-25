@@ -56,6 +56,7 @@
             margin-bottom: 30px;
             transition: all 0.3s ease;
             cursor: pointer;
+            position: relative;
         }
 
         .upload-area:hover {
@@ -66,6 +67,12 @@
         .upload-area.dragover {
             border-color: #4CAF50;
             background-color: #e8f5e8;
+        }
+
+        .upload-area.disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         .upload-icon {
@@ -93,10 +100,36 @@
             font-size: 1rem;
             cursor: pointer;
             transition: background 0.3s ease;
+            pointer-events: none; /* ป้องกันการคลิกปุ่มโดยตรง */
         }
 
         .upload-btn:hover {
             background: #45a049;
+        }
+
+        .upload-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .model-status {
+            background: #fff3cd;
+            color: #856404;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .model-status.loaded {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .model-status.error {
+            background: #f8d7da;
+            color: #721c24;
         }
 
         .preview-section {
@@ -267,11 +300,16 @@
         </div>
 
         <div class="content">
+            <!-- Model Status Indicator -->
+            <div class="model-status" id="modelStatus">
+                🔄 กำลังโหลดโมเดล AI...
+            </div>
+
             <div class="upload-area" id="uploadArea">
                 <div class="upload-icon">📁</div>
                 <div class="upload-text">ลากและวางภาพที่นี่ หรือคลิกเพื่อเลือกไฟล์</div>
-                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-                    เลือกภาพ
+                <button class="upload-btn" id="uploadBtn" disabled>
+                    กำลังโหลดโมเดล...
                 </button>
                 <input type="file" id="fileInput" class="file-input" accept="image/*">
             </div>
@@ -300,35 +338,67 @@
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
 
     <script>
-        let model, webcam, labelContainer, maxPredictions;
+        let model, maxPredictions;
+        let modelLoaded = false;
+        let isProcessing = false;
+        
         const modelURL = 'https://teachablemachine.withgoogle.com/models/DD76uYD8k/model.json';
         const metadataURL = 'https://teachablemachine.withgoogle.com/models/DD76uYD8k/metadata.json';
 
         // Initialize the model
         async function init() {
+            const modelStatus = document.getElementById('modelStatus');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadArea = document.getElementById('uploadArea');
+            
             try {
+                modelStatus.textContent = '🔄 กำลังโหลดโมเดล AI...';
+                modelStatus.className = 'model-status';
+                
                 model = await tmImage.load(modelURL, metadataURL);
                 maxPredictions = model.getTotalClasses();
+                modelLoaded = true;
+                
+                // อัพเดท UI เมื่อโมเดลโหลดเสร็จ
+                modelStatus.textContent = '✅ โมเดล AI พร้อมใช้งาน';
+                modelStatus.className = 'model-status loaded';
+                uploadBtn.textContent = 'เลือกภาพ';
+                uploadBtn.disabled = false;
+                uploadArea.classList.remove('disabled');
+                
                 console.log('Model loaded successfully');
+                
             } catch (error) {
                 console.error('Error loading model:', error);
-                showError('ไม่สามารถโหลดโมเดลได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+                modelStatus.textContent = '❌ ไม่สามารถโหลดโมเดลได้';
+                modelStatus.className = 'model-status error';
+                uploadBtn.textContent = 'โมเดลไม่พร้อม';
+                uploadBtn.disabled = true;
+                showError('ไม่สามารถโหลดโมเดลได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต แล้วรีโหลดหน้า');
             }
         }
 
         // File input handling
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
         
-        // Drag and drop handling
+        // Upload area click handling - แก้ไขให้คลิกได้เฉพาะครั้งเดียว
         const uploadArea = document.getElementById('uploadArea');
         
-        uploadArea.addEventListener('click', () => {
-            document.getElementById('fileInput').click();
+        uploadArea.addEventListener('click', (e) => {
+            // ป้องกันการ propagation ของ event
+            e.stopPropagation();
+            
+            if (modelLoaded && !isProcessing) {
+                document.getElementById('fileInput').click();
+            }
         });
 
+        // Drag and drop handling
         uploadArea.addEventListener('dragover', (e) => {
             e.preventDefault();
-            uploadArea.classList.add('dragover');
+            if (modelLoaded && !isProcessing) {
+                uploadArea.classList.add('dragover');
+            }
         });
 
         uploadArea.addEventListener('dragleave', () => {
@@ -338,20 +408,29 @@
         uploadArea.addEventListener('drop', (e) => {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
+            if (modelLoaded && !isProcessing) {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFile(files[0]);
+                }
             }
         });
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (file) {
+            if (file && !isProcessing) {
                 handleFile(file);
             }
+            // Reset file input เพื่อให้สามารถเลือกไฟล์เดิมได้
+            event.target.value = '';
         }
 
-        function handleFile(file) {
+        async function handleFile(file) {
+            if (isProcessing) {
+                console.log('Already processing, skipping...');
+                return;
+            }
+
             if (!file.type.startsWith('image/')) {
                 showError('กรุณาเลือกไฟล์ภาพเท่านั้น');
                 return;
@@ -362,35 +441,68 @@
                 return;
             }
 
+            isProcessing = true;
             hideError();
             showLoading();
 
-            const reader = new FileReader();
-            reader.onload = async (e) => {
+            try {
+                const imageDataUrl = await readFileAsDataURL(file);
+                const img = await loadImage(imageDataUrl);
+                
+                // แสดงภาพ preview
+                document.getElementById('previewImg').src = imageDataUrl;
+                document.getElementById('previewSection').style.display = 'block';
+                
+                if (modelLoaded) {
+                    // ประมวลผลทันที
+                    await predict(img);
+                } else {
+                    // แสดงข้อความรอโมเดล
+                    showError('โมเดลยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่');
+                }
+                
+            } catch (error) {
+                console.error('Error handling file:', error);
+                showError('เกิดข้อผิดพลาดในการอ่านไฟล์ กรุณาลองใหม่');
+            } finally {
+                hideLoading();
+                isProcessing = false;
+            }
+        }
+
+        // Helper function to read file as data URL
+        function readFileAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.onerror = (e) => reject(e);
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // Helper function to load image
+        function loadImage(src) {
+            return new Promise((resolve, reject) => {
                 const img = new Image();
-                img.onload = async () => {
-                    document.getElementById('previewImg').src = e.target.result;
-                    document.getElementById('previewSection').style.display = 'block';
-                    
-                    if (model) {
-                        await predict(img);
-                    } else {
-                        showError('โมเดลยังไม่พร้อม กรุณารอสักครู่แล้วลองใหม่');
-                    }
-                    hideLoading();
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+                img.onload = () => resolve(img);
+                img.onerror = (e) => reject(e);
+                img.src = src;
+            });
         }
 
         async function predict(image) {
+            if (!modelLoaded) {
+                throw new Error('Model not loaded');
+            }
+
             try {
+                console.log('Starting prediction...');
                 const prediction = await model.predict(image);
+                console.log('Prediction completed:', prediction);
                 displayPredictions(prediction);
             } catch (error) {
                 console.error('Prediction error:', error);
-                showError('เกิดข้อผิดพลาดในการประมวลผลภาพ');
+                throw error;
             }
         }
 
@@ -441,6 +553,11 @@
 
         // Initialize the model when page loads
         window.addEventListener('load', init);
+        
+        // Debug: Log model status
+        setInterval(() => {
+            console.log('Model loaded:', modelLoaded, 'Is processing:', isProcessing);
+        }, 5000);
     </script>
 </body>
 </html>
