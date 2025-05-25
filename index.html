@@ -91,25 +91,147 @@
             display: none;
         }
 
-        .upload-btn {
+        .button-group {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .upload-btn, .camera-btn {
             background: #4CAF50;
             color: white;
-            padding: 12px 30px;
+            padding: 12px 24px;
             border: none;
             border-radius: 25px;
             font-size: 1rem;
             cursor: pointer;
-            transition: background 0.3s ease;
-            pointer-events: none; /* ป้องกันการคลิกปุ่มโดยตรง */
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: center;
         }
 
-        .upload-btn:hover {
+        .upload-btn:hover, .camera-btn:hover {
             background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
         }
 
-        .upload-btn:disabled {
+        .upload-btn:disabled, .camera-btn:disabled {
             background: #ccc;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .camera-btn {
+            background: #2196F3;
+        }
+
+        .camera-btn:hover {
+            background: #1976D2;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.3);
+        }
+
+        /* Camera modal styles */
+        .camera-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .camera-container {
+            background: white;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 90vw;
+            max-height: 90vh;
+            position: relative;
+        }
+
+        .camera-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .camera-title {
+            font-size: 1.5rem;
+            color: #333;
+        }
+
+        .close-camera {
+            background: #f44336;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .camera-content {
+            text-align: center;
+        }
+
+        .camera-video {
+            max-width: 100%;
+            max-height: 60vh;
+            border-radius: 10px;
+            background: #000;
+        }
+
+        .camera-canvas {
+            display: none;
+            max-width: 100%;
+            border-radius: 10px;
+        }
+
+        .camera-controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .capture-btn, .retake-btn, .use-photo-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .capture-btn {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .retake-btn {
+            background: #FF9800;
+            color: white;
+        }
+
+        .use-photo-btn {
+            background: #2196F3;
+            color: white;
         }
 
         .model-status {
@@ -307,11 +429,17 @@
 
             <div class="upload-area" id="uploadArea">
                 <div class="upload-icon">📁</div>
-                <div class="upload-text">ลากและวางภาพที่นี่ หรือคลิกเพื่อเลือกไฟล์</div>
-                <button class="upload-btn" id="uploadBtn" disabled>
-                    กำลังโหลดโมเดล...
-                </button>
+                <div class="upload-text">ลากและวางภาพที่นี่ หรือเลือกตัวเลือกด้านล่าง</div>
+                <div class="button-group">
+                    <button class="upload-btn" id="uploadBtn" disabled>
+                        📁 เลือกไฟล์
+                    </button>
+                    <button class="camera-btn" id="cameraBtn" disabled>
+                        📷 ถ่ายภาพ
+                    </button>
+                </div>
                 <input type="file" id="fileInput" class="file-input" accept="image/*">
+                <input type="file" id="cameraInput" class="file-input" accept="image/*" capture="environment">
             </div>
 
             <div class="error" id="errorMessage"></div>
@@ -329,6 +457,25 @@
                 <div class="results-section">
                     <h3 class="results-title">ผลการจำแนกประเภท</h3>
                     <div id="predictions"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Camera Modal -->
+    <div class="camera-modal" id="cameraModal">
+        <div class="camera-container">
+            <div class="camera-header">
+                <h3 class="camera-title">📷 ถ่ายภาพ</h3>
+                <button class="close-camera" id="closeCamera">✕</button>
+            </div>
+            <div class="camera-content">
+                <video class="camera-video" id="cameraVideo" autoplay playsinline></video>
+                <canvas class="camera-canvas" id="cameraCanvas"></canvas>
+                <div class="camera-controls">
+                    <button class="capture-btn" id="captureBtn">📸 ถ่ายภาพ</button>
+                    <button class="retake-btn" id="retakeBtn" style="display: none;">🔄 ถ่ายใหม่</button>
+                    <button class="use-photo-btn" id="usePhotoBtn" style="display: none;">✅ ใช้ภาพนี้</button>
                 </div>
             </div>
         </div>
@@ -362,8 +509,15 @@
                 // อัพเดท UI เมื่อโมเดลโหลดเสร็จ
                 modelStatus.textContent = '✅ โมเดล AI พร้อมใช้งาน';
                 modelStatus.className = 'model-status loaded';
-                uploadBtn.textContent = 'เลือกภาพ';
+                
+                const uploadBtn = document.getElementById('uploadBtn');
+                const cameraBtn = document.getElementById('cameraBtn');
+                
+                uploadBtn.textContent = '📁 เลือกไฟล์';
                 uploadBtn.disabled = false;
+                cameraBtn.textContent = '📷 ถ่ายภาพ';
+                cameraBtn.disabled = false;
+                
                 uploadArea.classList.remove('disabled');
                 
                 console.log('Model loaded successfully');
@@ -372,19 +526,52 @@
                 console.error('Error loading model:', error);
                 modelStatus.textContent = '❌ ไม่สามารถโหลดโมเดลได้';
                 modelStatus.className = 'model-status error';
+                
+                const uploadBtn = document.getElementById('uploadBtn');
+                const cameraBtn = document.getElementById('cameraBtn');
+                
                 uploadBtn.textContent = 'โมเดลไม่พร้อม';
                 uploadBtn.disabled = true;
+                cameraBtn.textContent = 'โมเดลไม่พร้อม';
+                cameraBtn.disabled = true;
                 showError('ไม่สามารถโหลดโมเดลได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต แล้วรีโหลดหน้า');
             }
         }
 
         // File input handling
         document.getElementById('fileInput').addEventListener('change', handleFileSelect);
+        document.getElementById('cameraInput').addEventListener('change', handleFileSelect);
+        
+        // Button click handlers
+        document.getElementById('uploadBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (modelLoaded && !isProcessing) {
+                document.getElementById('fileInput').click();
+            }
+        });
+        
+        document.getElementById('cameraBtn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (modelLoaded && !isProcessing) {
+                // ตรวจสอบว่าอุปกรณ์รองรับกล้องหรือไม่
+                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                    openCameraModal();
+                } else {
+                    // Fallback สำหรับอุปกรณ์ที่ไม่รองรับ camera API
+                    document.getElementById('cameraInput').click();
+                }
+            }
+        });
         
         // Upload area click handling - แก้ไขให้คลิกได้เฉพาะครั้งเดียว
         const uploadArea = document.getElementById('uploadArea');
         
         uploadArea.addEventListener('click', (e) => {
+            // ตรวจสอบว่าคลิกที่ปุ่มหรือไม่
+            if (e.target.closest('.upload-btn') || e.target.closest('.camera-btn')) {
+                return; // ถ้าคลิกที่ปุ่ม ให้ปุ่มจัดการเอง
+            }
+            
             // ป้องกันการ propagation ของ event
             e.stopPropagation();
             
@@ -553,6 +740,120 @@
 
         // Initialize the model when page loads
         window.addEventListener('load', init);
+        
+        // Camera functionality
+        let cameraStream = null;
+        let capturedImageData = null;
+        
+        async function openCameraModal() {
+            const modal = document.getElementById('cameraModal');
+            const video = document.getElementById('cameraVideo');
+            
+            try {
+                // ขอสิทธิ์เข้าถึงกล้อง
+                cameraStream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'environment' // ใช้กล้องหลัง
+                    } 
+                });
+                
+                video.srcObject = cameraStream;
+                modal.style.display = 'flex';
+                
+                // รีเซ็ตสถานะ
+                resetCameraControls();
+                
+            } catch (error) {
+                console.error('Error accessing camera:', error);
+                showError('ไม่สามารถเข้าถึงกล้องได้ กรุณาอนุญาตการใช้งานกล้องในเบราว์เซอร์');
+                
+                // Fallback ไปใช้ file input แทน
+                document.getElementById('cameraInput').click();
+            }
+        }
+        
+        function closeCameraModal() {
+            const modal = document.getElementById('cameraModal');
+            
+            // หยุดการใช้งานกล้อง
+            if (cameraStream) {
+                cameraStream.getTracks().forEach(track => track.stop());
+                cameraStream = null;
+            }
+            
+            modal.style.display = 'none';
+            resetCameraControls();
+            capturedImageData = null;
+        }
+        
+        function resetCameraControls() {
+            document.getElementById('cameraVideo').style.display = 'block';
+            document.getElementById('cameraCanvas').style.display = 'none';
+            document.getElementById('captureBtn').style.display = 'inline-block';
+            document.getElementById('retakeBtn').style.display = 'none';
+            document.getElementById('usePhotoBtn').style.display = 'none';
+        }
+        
+        function capturePhoto() {
+            const video = document.getElementById('cameraVideo');
+            const canvas = document.getElementById('cameraCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // ตั้งค่าขนาด canvas ให้เท่ากับ video
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            
+            // วาดภาพจาก video ลงใน canvas
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // แปลงเป็น data URL
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            // แสดงภาพที่ถ่าย
+            video.style.display = 'none';
+            canvas.style.display = 'block';
+            
+            // แสดงปุ่มควบคุม
+            document.getElementById('captureBtn').style.display = 'none';
+            document.getElementById('retakeBtn').style.display = 'inline-block';
+            document.getElementById('usePhotoBtn').style.display = 'inline-block';
+        }
+        
+        async function useCapturedPhoto() {
+            if (capturedImageData) {
+                try {
+                    // แปลง data URL เป็น blob
+                    const response = await fetch(capturedImageData);
+                    const blob = await response.blob();
+                    
+                    // สร้าง File object
+                    const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
+                    
+                    // ปิด modal
+                    closeCameraModal();
+                    
+                    // ประมวลผลภาพ
+                    await handleFile(file);
+                    
+                } catch (error) {
+                    console.error('Error processing captured photo:', error);
+                    showError('เกิดข้อผิดพลาดในการประมวลผลภาพ');
+                }
+            }
+        }
+        
+        // Camera modal event listeners
+        document.getElementById('closeCamera').addEventListener('click', closeCameraModal);
+        document.getElementById('captureBtn').addEventListener('click', capturePhoto);
+        document.getElementById('retakeBtn').addEventListener('click', resetCameraControls);
+        document.getElementById('usePhotoBtn').addEventListener('click', useCapturedPhoto);
+        
+        // ปิด modal เมื่อคลิกพื้นหลัง
+        document.getElementById('cameraModal').addEventListener('click', (e) => {
+            if (e.target.id === 'cameraModal') {
+                closeCameraModal();
+            }
+        });
         
         // Debug: Log model status
         setInterval(() => {
